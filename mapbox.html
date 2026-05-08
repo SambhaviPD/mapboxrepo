@@ -288,7 +288,9 @@
         fetchSupabaseData()
       ]);
 
-      allRows = supabaseRows;
+      // Handle different Supabase response formats
+      allRows = Array.isArray(supabaseRows) ? supabaseRows : [];
+      console.log('Supabase response:', JSON.stringify(supabaseRows).substring(0, 200));
 
       map.addSource('delaware-tracts', {
         type: 'geojson',
