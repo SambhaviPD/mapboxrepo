@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+
+    /* Legend */
+    #legend {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      z-index: 1;
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-family: sans-serif;
+      font-size: 12px;
+      min-width: 160px;
+    }
+    #legend h4 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: #333;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .legend-color {
+      width: 20px;
+      height: 14px;
+      margin-right: 8px;
+      border-radius: 2px;
+    }
+
+    /* Tooltip */
+    #tooltip {
+      position: absolute;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-family: sans-serif;
+      font-size: 12px;
+      pointer-events: none;
+      display: none;
+      z-index: 2;
+      min-width: 180px;
+    }
+    #tooltip h4 {
+      margin: 0 0 6px 0;
+      font-size: 13px;
+      color: #333;
+    }
+    #tooltip p {
+      margin: 2px 0;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="legend">
+  <h4 id="legend-title">Achieved Savings (kWh)</h4>
+  <div id="legend-items"></div>
+</div>
+<div id="tooltip"></div>
+
+<script>
+  // ─────────────────────────────────────────
+  // CONFIGURATION — FILL IN YOUR VALUES HERE
+  // ─────────────────────────────────────────
+  const MAPBOX_TOKEN  = 'pk.eyJ1IjoiaGVsbG9zYW1iaGF2aSIsImEiOiJjbTk4YXBoM2gwMHpkMmpwemw3YXBkdzB2In0.cAJ7kdiXHhJUWaFw-hkOag';
+  const SUPABASE_URL  = 'https://qrtuwigdfavlrgjdcyet.supabase.co';
+  const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFydHV3aWdkZmF2bHJnamRjeWV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDAwMTQsImV4cCI6MjA5MzAxNjAxNH0.1CP_vw9k-z26ht2WVDDiSKHir4OogWizacjyENJrYT0';
+  const GEOJSON_URL   = 'https://qrtuwigdfavlrgjdcyet.supabase.co/storage/v1/object/public/geojson/tl_2020_10_tract.json';
+  // ─────────────────────────────────────────
+// DEBUG — remove after testing
+fetch(GEOJSON_URL)
+  .then(r => r.text())
+  .then(t => console.log('GeoJSON first 100 chars:', t.substring(0, 100)))
+  .catch(e => console.error('GeoJSON fetch error:', e));
+
+fetch(`${SUPABASE_URL}/rest/v1/map_choropleth?select=*`, {
+  headers: {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`
+  }
+})
+  .then(r => r.text())
+  .then(t => console.log('Supabase first 100 chars:', t.substring(0, 100)))
+  .catch(e => console.error('Supabase fetch error:', e));
+
+  // Raw data from Supabase
+  let allRows        = [];
+  let choroplethData = {};
+
+  // ─────────────────────────────────────────
+  // READ FILTERS FROM WEWEB VARIABLES
+  // WeWeb sets these on the window object.
+  // In WeWeb, create these variables and bind
+  // your dropdown/toggle values to them:
+  //   window.ww_metric    → 'achieved' or 'untapped'
+  //   window.ww_unit      → 'kwh' or 'mmbtu'
+  //   window.ww_building  → 'all', 'single_family', 'manufactured', 'multifamily'
+  //   window.ww_fuel      → 'all', 'electric', 'natural_gas', 'other'
+  //   window.ww_scenario  → 'Scenario 1', 'Scenario 2', 'Scenario 3'
+  // ─────────────────────────────────────────
+  function getFilters() {
+    return {
+      metric:   window.ww_metric   || 'achieved',
+      unit:     window.ww_unit     || 'kwh',
+      building: window.ww_building || 'all',
+      fuel:     window.ww_fuel     || 'all',
+      scenario: window.ww_scenario || 'Scenario 1'
+    };
+  }
+
+  // ─────────────────────────────────────────
+  // INITIALISE MAP
+  // ─────────────────────────────────────────
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/light-v11',
+    center: [-75.5, 38.9],
+    zoom: 8
+  });
+
+  map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+  // ─────────────────────────────────────────
+  // FETCH DATA
+  // ─────────────────────────────────────────
+  async function fetchSupabaseData() {
+    const url = `${SUPABASE_URL}/rest/v1/map_choropleth?select=*`;
+    const response = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    return await response.json();
+  }
+
+  async function fetchGeoJSON() {
+    const response = await fetch(GEOJSON_URL);
+    return await response.json();
+  }
+
+  // ─────────────────────────────────────────
+  // AGGREGATE DATA BY TRACT
+  // ─────────────────────────────────────────
+  function aggregateData(rows) {
+    const { metric, unit, building, fuel, scenario } = getFilters();
+
+    const filtered = rows.filter(row => {
+      if (building !== 'all' && row.building_type !== building) return false;
+      if (fuel !== 'all' && row.fuel_type !== fuel) return false;
+      if (row.building_type === 'multifamily') {
+        if (row.scenario !== scenario) return false;
+      }
+      return true;
+    });
+
+    const result = {};
+    filtered.forEach(row => {
+      if (!result[row.tract_id]) result[row.tract_id] = 0;
+      let value = 0;
+      if (metric === 'achieved') {
+        value = unit === 'kwh' ? row.achieved_kwh : row.achieved_mmbtu;
+      } else {
+        value = unit === 'kwh' ? row.untapped_kwh : row.untapped_mmbtu;
+      }
+      result[row.tract_id] += (value || 0);
+    });
+
+    return result;
+  }
+
+  // ─────────────────────────────────────────
+  // COLOR SCALE
+  // ─────────────────────────────────────────
+  function getColor(pct) {
+    if (pct <= 0)  return '#f7fbff';
+    if (pct < 0.2) return '#c6dbef';
+    if (pct < 0.4) return '#6baed6';
+    if (pct < 0.6) return '#2171b5';
+    if (pct < 0.8) return '#084594';
+    return '#08306b';
+  }
+
+  function buildColorExpression(data) {
+    const values = Object.values(data).filter(v => v > 0);
+    if (values.length === 0) return '#f7fbff';
+
+    const max = Math.max(...values);
+    const expression = ['match', ['get', 'GEOID']];
+
+    Object.entries(data).forEach(([tractId, value]) => {
+      const pct = max > 0 ? value / max : 0;
+      expression.push(tractId, getColor(pct));
+    });
+
+    expression.push('#eeeeee');
+    return expression;
+  }
+
+  // ─────────────────────────────────────────
+  // UPDATE MAP
+  // ─────────────────────────────────────────
+  function updateMap() {
+    choroplethData = aggregateData(allRows);
+    const colorExpr = buildColorExpression(choroplethData);
+
+    if (map.getLayer('tracts-fill')) {
+      map.setPaintProperty('tracts-fill', 'fill-color', colorExpr);
+    }
+
+    updateLegend();
+  }
+
+  // ─────────────────────────────────────────
+  // LEGEND
+  // ─────────────────────────────────────────
+  function updateLegend() {
+    const { metric, unit } = getFilters();
+    const values = Object.values(choroplethData).filter(v => v > 0);
+    const max = values.length > 0 ? Math.max(...values) : 0;
+
+    const metricLabel = metric === 'achieved' ? 'Achieved' : 'Untapped';
+    const unitLabel   = unit === 'kwh' ? 'kWh' : 'MMBtu';
+    document.getElementById('legend-title').textContent
+      = `${metricLabel} Savings (${unitLabel})`;
+
+    const steps  = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+    const colors = ['#f7fbff','#c6dbef','#6baed6','#2171b5','#084594','#08306b'];
+
+    let html = '';
+    steps.forEach((step, i) => {
+      const val = Math.round(step * max).toLocaleString('en-US');
+      html += `
+        <div class="legend-item">
+          <div class="legend-color" style="background:${colors[i]}"></div>
+          <span>${val}</span>
+        </div>`;
+    });
+    document.getElementById('legend-items').innerHTML = html;
+  }
+
+  // ─────────────────────────────────────────
+  // TOOLTIP
+  // ─────────────────────────────────────────
+  function showTooltip(e) {
+    const tooltip  = document.getElementById('tooltip');
+    const features = map.queryRenderedFeatures(e.point, { layers: ['tracts-fill'] });
+    if (!features.length) {
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    const { metric, unit } = getFilters();
+    const tractId     = features[0].properties.GEOID;
+    const tractName   = features[0].properties.NAME;
+    const value       = choroplethData[tractId] || 0;
+    const metricLabel = metric === 'achieved' ? 'Achieved' : 'Untapped';
+    const unitLabel   = unit === 'kwh' ? 'kWh' : 'MMBtu';
+
+    tooltip.innerHTML = `
+      <h4>Tract ${tractName}</h4>
+      <p><strong>ID:</strong> ${tractId}</p>
+      <p><strong>${metricLabel} (${unitLabel}):</strong> 
+         ${value.toLocaleString('en-US')}</p>
+    `;
+
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.originalEvent.pageX + 12) + 'px';
+    tooltip.style.top  = (e.originalEvent.pageY - 40) + 'px';
+  }
+
+  // ─────────────────────────────────────────
+  // WEWEB VARIABLE LISTENER
+  // Call window.updateMapFilters() from WeWeb
+  // workflows whenever a filter changes
+  // ─────────────────────────────────────────
+  window.updateMapFilters = function() {
+    updateMap();
+  };
+
+  // ─────────────────────────────────────────
+  // INITIALISE
+  // ─────────────────────────────────────────
+  map.on('load', async () => {
+    try {
+      const [geojson, supabaseRows] = await Promise.all([
+        fetchGeoJSON(),
+        fetchSupabaseData()
+      ]);
+
+      allRows = supabaseRows;
+
+      map.addSource('delaware-tracts', {
+        type: 'geojson',
+        data: geojson
+      });
+
+      choroplethData = aggregateData(allRows);
+      const colorExpr = buildColorExpression(choroplethData);
+
+      map.addLayer({
+        id: 'tracts-fill',
+        type: 'fill',
+        source: 'delaware-tracts',
+        paint: {
+          'fill-color': colorExpr,
+          'fill-opacity': 0.75
+        }
+      });
+
+      map.addLayer({
+        id: 'tracts-outline',
+        type: 'line',
+        source: 'delaware-tracts',
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 0.5
+        }
+      });
+
+      map.on('mousemove', 'tracts-fill', showTooltip);
+      map.on('mouseleave', 'tracts-fill', () => {
+        document.getElementById('tooltip').style.display = 'none';
+      });
+      map.on('mouseenter', 'tracts-fill', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'tracts-fill', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      updateLegend();
+
+    } catch (err) {
+      console.error('Map load error:', err);
+    }
+  });
+</script>
+</body>
+</html>
