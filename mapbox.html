@@ -124,7 +124,7 @@
   // FETCH DATA
   // ─────────────────────────────────────────
   async function fetchSupabaseData() {
-    const url = `${SUPABASE_URL}/rest/v1/map_choropleth?select=*`;
+    const url = `${SUPABASE_URL}/rest/v1/view_map_choropleth?select=*`;
     const response = await fetch(url, {
       headers: {
         'apikey': SUPABASE_KEY,
