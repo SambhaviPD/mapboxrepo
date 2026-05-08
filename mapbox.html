@@ -118,6 +118,11 @@
     zoom: 8
   });
 
+  map.setMaxBounds([
+    [-76.2, 38.4],  // Southwest corner [lng, lat]
+    [-74.8, 40.0]   // Northeast corner [lng, lat]
+  ]);
+
   map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
   // ─────────────────────────────────────────
