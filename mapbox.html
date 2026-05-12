@@ -281,9 +281,9 @@
   // ─────────────────────────────────────────
   window.addEventListener('message', function(event) {
     const data = event.data;
-    
+    console.log('Message received:', event.data);
     if (data && data.type === 'MAP_FILTER_UPDATE') {
-      // Set filters on window object
+      console.log('Updating map with:', data);
       if (data.metric   !== undefined) window.ww_metric   = data.metric;
       if (data.unit     !== undefined) window.ww_unit     = data.unit;
       if (data.building !== undefined) window.ww_building = data.building;
