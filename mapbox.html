@@ -279,9 +279,24 @@
   // Call window.updateMapFilters() from WeWeb
   // workflows whenever a filter changes
   // ─────────────────────────────────────────
-  window.updateMapFilters = function() {
-    updateMap();
-  };
+  window.addEventListener("message", (event) => {
+    // Optional: check origin for security
+    // if (event.origin !== "https://your-weweb-app-url.com") return;
+
+    if (event.data.type === 'UPDATE_MAP_FILTERS') {
+      const payload = event.data.payload;
+
+      // Update the window objects your getFilters() function uses
+      window.ww_metric   = payload.metric;
+      window.ww_unit     = payload.unit;
+      window.ww_building = payload.building;
+      window.ww_fuel     = payload.fuel;
+      window.ww_scenario = payload.scenario;
+
+      // Trigger the map update
+      updateMap();
+    }
+  }, false);
 
   // ─────────────────────────────────────────
   // INITIALISE
