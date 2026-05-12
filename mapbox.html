@@ -98,15 +98,15 @@
   // ─────────────────────────────────────────
 
   function getFilters() {
-  const params = new URLSearchParams(window.location.search);
-  return {
-    metric:   params.get('metric')   || window.ww_metric   || 'achieved',
-    unit:     params.get('unit')     || window.ww_unit     || 'kwh',
-    building: params.get('building') || window.ww_building || 'all',
-    fuel:     params.get('fuel')     || window.ww_fuel     || 'all',
-    scenario: params.get('scenario') || window.ww_scenario || 'Scenario 1'
-  };
-}
+    const params = new URLSearchParams(window.location.search);
+    return {
+      metric:   window.ww_metric   || params.get('metric')   || 'achieved',
+      unit:     window.ww_unit     || params.get('unit')     || 'kwh',
+      building: window.ww_building || params.get('building') || 'all',
+      fuel:     window.ww_fuel     || params.get('fuel')     || 'all',
+      scenario: window.ww_scenario || params.get('scenario') || 'Scenario 1'
+    };
+  }
 
   // ─────────────────────────────────────────
   // INITIALISE MAP
