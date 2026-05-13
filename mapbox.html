@@ -228,10 +228,10 @@
   function updateMap() {
     choroplethData = aggregateData(allRows);
     
-    const values = Object.values(choroplethData).filter(v => v > 0);
+    const total = Object.values(choroplethData).reduce((sum, v) => sum + v, 0);
     
     // Show/hide no data message
-    if (values.length === 0) {
+    if (total === 0) {
       document.getElementById('no-data').style.display = 'block';
     } else {
       document.getElementById('no-data').style.display = 'none';
