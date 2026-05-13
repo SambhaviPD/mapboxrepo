@@ -226,8 +226,10 @@
   // UPDATE MAP
   // ─────────────────────────────────────────
   function updateMap() {
+    console.log("all choroplethData1", choroplethData);
     choroplethData = aggregateData(allRows);
-    
+    console.log("all rows", allRows);
+    console.log("all choroplethData", choroplethData);
     const total = Object.values(choroplethData).reduce((sum, v) => sum + v, 0);
     
     // Show/hide no data message
