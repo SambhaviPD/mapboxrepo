@@ -71,7 +71,25 @@
   <div id="legend-items"></div>
 </div>
 <div id="tooltip"></div>
-
+<!-- Add after <div id="map"> -->
+<div id="no-data" style="
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 20px 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  font-family: sans-serif;
+  font-size: 14px;
+  color: #666;
+  display: none;
+  z-index: 10;
+  text-align: center;
+">
+  <div style="font-size: 24px; margin-bottom: 8px;">📭</div>
+  <div>No data available for the selected filters</div>
+</div>
+  
 <script>
   // ─────────────────────────────────────────
   // CONFIGURATION — FILL IN YOUR VALUES HERE
@@ -209,15 +227,23 @@
   // ─────────────────────────────────────────
   function updateMap() {
     choroplethData = aggregateData(allRows);
+    
+    const values = Object.values(choroplethData).filter(v => v > 0);
+    
+    // Show/hide no data message
+    if (values.length === 0) {
+      document.getElementById('no-data').style.display = 'block';
+    } else {
+      document.getElementById('no-data').style.display = 'none';
+    }
+    
     const colorExpr = buildColorExpression(choroplethData);
-
     if (map.getLayer('tracts-fill')) {
       map.setPaintProperty('tracts-fill', 'fill-color', colorExpr);
     }
-
+  
     updateLegend();
   }
-
   // ─────────────────────────────────────────
   // LEGEND
   // ─────────────────────────────────────────
