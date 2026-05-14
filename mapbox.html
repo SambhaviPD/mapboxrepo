@@ -102,8 +102,8 @@
     return {
       metric:   params.get('metric')   || window.ww_metric   || 'achieved',
       unit:     params.get('unit')     || window.ww_unit     || 'kwh',
-      building: params.get('building') || window.ww_building || 'Single family',
-      fuel:     params.get('fuel')     || window.ww_fuel     || 'Electric',
+      building: params.get('building') || window.ww_building || 'all',
+      fuel:     params.get('fuel')     || window.ww_fuel     || 'all',
       scenario: params.get('scenario') || window.ww_scenario || 'Scenario 1'
     };
   }
@@ -155,7 +155,7 @@
     const filtered = rows.filter(row => {
       if (building !== 'all' && row.building_type !== building) return false;
       if (fuel !== 'all' && row.fuel_type !== fuel) return false;
-      if (row.building_type === 'Multifamily') {
+      if (row.building_type === 'multifamily') {
         if (row.scenario !== scenario) return false;
       }
       return true;
