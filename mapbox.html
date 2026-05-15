@@ -171,7 +171,7 @@ function aggregateData(rows) {
     } else {
       value = unit === 'kwh' ? row.untapped_kwh : row.untapped_mmbtu;
     }
-    result[row.tract_id] += (value || 0);
+    result[row.tract_id] += Math.max(0, value || 0);
   });
 
   console.log('Result sample:', Object.entries(result).slice(0, 3));
