@@ -313,7 +313,7 @@ function aggregateData(rows) {
       // Handle different Supabase response formats
       allRows = Array.isArray(supabaseRows) ? supabaseRows : [];
       console.log('Supabase response:', JSON.stringify(supabaseRows).substring(0, 200));
-      console.log('Sample row keys:', Object.keys(allRows[0]));
+      console.log('Sample row keys:', allRows[0]);
 
       map.addSource('delaware-tracts', {
         type: 'geojson',
@@ -321,6 +321,8 @@ function aggregateData(rows) {
       });
 
       choroplethData = aggregateData(allRows);
+      console.log('choroplethData sample:', Object.entries(choroplethData).slice(0, 3));  // ← ADD
+      console.log('choroplethData total value:', Object.values(choroplethData).reduce((a,b) => a+b, 0));  // ← ADD
       const colorExpr = buildColorExpression(choroplethData);
 
       map.addLayer({
