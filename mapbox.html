@@ -149,32 +149,35 @@
   // ─────────────────────────────────────────
   // AGGREGATE DATA BY TRACT
   // ─────────────────────────────────────────
-  function aggregateData(rows) {
-    const { metric, unit, building, fuel, scenario } = getFilters();
+function aggregateData(rows) {
+  const { metric, unit, building, fuel, scenario } = getFilters();
+  
+  console.log('Filters received:', { metric, unit, building, fuel });
+  
+  const filtered = rows.filter(row => {
+    if (building !== 'all' && row.building_type !== building) return false;
+    if (fuel !== 'all' && row.fuel_type !== fuel) return false;
+    return true;
+  });
+  
+  console.log('Filtered rows count:', filtered.length);
+  
+  const result = {};
+  filtered.forEach(row => {
+    if (!result[row.tract_id]) result[row.tract_id] = 0;
+    let value = 0;
+    if (metric === 'achieved') {
+      value = unit === 'kwh' ? row.achieved_kwh : row.achieved_mmbtu;
+    } else {
+      value = unit === 'kwh' ? row.untapped_kwh : row.untapped_mmbtu;
+    }
+    result[row.tract_id] += (value || 0);
+  });
 
-    const filtered = rows.filter(row => {
-      if (building !== 'all' && row.building_type !== building) return false;
-      if (fuel !== 'all' && row.fuel_type !== fuel) return false;
-      if (row.building_type === 'multifamily') {
-        if (row.scenario !== scenario) return false;
-      }
-      return true;
-    });
-
-    const result = {};
-    filtered.forEach(row => {
-      if (!result[row.tract_id]) result[row.tract_id] = 0;
-      let value = 0;
-      if (metric === 'achieved') {
-        value = unit === 'kwh' ? row.achieved_kwh : row.achieved_mmbtu;
-      } else {
-        value = unit === 'kwh' ? row.untapped_kwh : row.untapped_mmbtu;
-      }
-      result[row.tract_id] += (value || 0);
-    });
-
-    return result;
-  }
+  console.log('Result sample:', Object.entries(result).slice(0, 3));
+  
+  return result;
+}
 
   // ─────────────────────────────────────────
   // COLOR SCALE
